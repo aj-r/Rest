@@ -25,7 +25,8 @@ namespace Rest.Server
         ParamMismatch
     }
 
-    delegate string[] RestHandler(string[] args);
+    public delegate string RestHandler(string[] args);
+    public delegate byte[] RawRestHandler(string[] args);
 
     public class RestMethod
     {
@@ -43,7 +44,7 @@ namespace Rest.Server
             }
         }
         public int ParamCount { get; set; }
-        public RestHandler Handler { get; set; }
+        public RawRestHandler Handler { get; set; }
 
         private string _contentType;
         public string ContentType
@@ -85,7 +86,7 @@ namespace Rest.Server
             }
         }
 
-        public RestMethodMatch TryProcess(string url, out string response)
+        public RestMethodMatch TryProcess(string url, out byte[] response)
         {
             if (!url.StartsWith(BaseUrl))
             {

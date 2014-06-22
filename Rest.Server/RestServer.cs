@@ -6,11 +6,12 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
+using System.Web;
 
 namespace Rest.Server
 {
     /// <summary>
-    /// A simple multi-threaded REST server implementation
+    /// A simple multi-threaded HTTP REST server implementation
     /// </summary>
     public class RestServer
     {
@@ -18,6 +19,7 @@ namespace Rest.Server
         {
             Methods = new List<RestMethod>();
             listener = new HttpListener();
+            listener.Prefixes.Add(string.Format("http://*:{0}/", port));
         }
 
         /// <summary>
@@ -25,7 +27,6 @@ namespace Rest.Server
         /// </summary>
         public List<RestMethod> Methods { get; private set; }
 
-        //private TcpListener listener;
         private HttpListener listener;
         private Thread listenThread;
         private ManualResetEvent stopEvent = new ManualResetEvent(false);
@@ -37,7 +38,7 @@ namespace Rest.Server
         {
             if (!HttpListener.IsSupported)
             {
-                throw new NotSupportedException("HTTP listeners are not supported on your computer. Windows XP SP2 or later is required.")
+                throw new NotSupportedException("HTTP listeners are not supported on your computer. Windows XP SP2 or later is required.");
             }
             listenThread = new Thread(Listen);
             listenThread.Start();
@@ -72,8 +73,20 @@ namespace Rest.Server
                     Name = (attr.Name == null ? method.Name.ToLower() : attr.Name),
                     ParamCount = attr.ParamCount,
                     ContentType = attr.ContentType,
-                    Handler = (RestHandler)method.CreateDelegate(typeof(RestHandler), obj)
                 };
+                if (method.ReturnType == typeof(byte[]))
+                {
+                    restMethod.Handler = (RawRestHandler)method.CreateDelegate(typeof(RawRestHandler), obj);
+                }
+                else if (method.ReturnType == typeof(string))
+                {
+                    var handler = (RestHandler)method.CreateDelegate(typeof(RestHandler), obj);
+                    restMethod.Handler = (args) => Encoding.UTF8.GetBytes(handler(args));
+                }
+                else
+                {
+                    throw new Exception("Invalid return type for RestHandler method '{0}': invalid return type. Must be String or Byte[].");
+                }
                 Methods.Add(restMethod);
             }
         }
@@ -92,33 +105,38 @@ namespace Rest.Server
 
         private void ProcessRequest(HttpListenerContext context)
         {
-            var url = context.Request.Url;
-            string response;
-            foreach (var method in Methods)
+            try
             {
-                RestMethodMatch match = method.TryProcess(url.AbsoluteUri, out response);
-                switch (match)
+                var url = context.Request.Url;
+                byte[] response;
+                foreach (var method in Methods)
                 {
-                    case RestMethodMatch.Success:
-                        context.Response.StatusCode = 200;
-                        context.Response.StatusDescription = "OK";
-                        context.Response.ContentType = method.ContentType;
-                        var responseBytes = Encoding.UTF8.GetBytes(response);
-                        context.Response.ContentLength64 = responseBytes.Length;
-                        context.Response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
-                        context.Response.OutputStream.Close();
-                        return;
-                    case RestMethodMatch.ParamMismatch:
-                        context.Response.StatusCode = 500;
-                        context.Response.StatusDescription = "Internal server error";
-                        context.Response.OutputStream.Close();
-                        return;
+                    RestMethodMatch match = method.TryProcess(url.AbsoluteUri, out response);
+                    if (match != RestMethodMatch.Success)
+                    {
+                        continue;
+                    }
+                    context.Response.ContentType = method.ContentType;
+                    context.Response.ContentLength64 = response.Length;
+                    context.Response.OutputStream.Write(response, 0, response.Length);
+                    SendResponse(context.Response, 200);
+                    return;
                 }
+                // No matching method found
+                SendResponse(context.Response, 404);
             }
-            // No matching method found
-            context.Response.StatusCode = 404;
-            context.Response.StatusDescription = "Not Found";
-            context.Response.OutputStream.Close();
+            catch
+            {
+                // TODO: log exception
+                SendResponse(context.Response, 500);
+            }
+        }
+
+        private void SendResponse(HttpListenerResponse response, int status)
+        {
+            response.StatusCode = status;
+            response.StatusDescription = HttpWorkerRequest.GetStatusDescription(response.StatusCode);
+            response.OutputStream.Close();
         }
     }
 }

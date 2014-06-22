@@ -14,6 +14,16 @@ namespace Rest.Client
 {
     public class RestClient
     {
+        private static JavaScriptSerializer jsonSerializer;
+        private static NameJavaScriptConverter jsonConverter;
+
+        static RestClient()
+        {
+            jsonSerializer = new JavaScriptSerializer();
+            jsonConverter = new NameJavaScriptConverter();
+            jsonSerializer.RegisterConverters(new JavaScriptConverter[] { jsonConverter });
+        }
+
         /// <summary>
         /// Executes a REST request and returns the body in byte array format.
         /// </summary>
@@ -62,8 +72,16 @@ namespace Rest.Client
         /// <returns>The deserialized JSON object</returns>
         public async Task<T> ExecuteJson<T>(string uri)
         {
-            var json = await ExecuteString(uri);
-            return DeserializeJson<T>(json);
+            try
+            {
+                var json = await ExecuteString(uri);
+                return DeserializeJson<T>(json);
+            }
+            catch
+            {
+                // TODO: log exception
+                return default(T);
+            }
         }
 
         /// <summary>
@@ -132,12 +150,8 @@ namespace Rest.Client
         private T DeserializeJson<T>(string json)
         {
             // Convert json string to CLR object
-            var serializer = new JavaScriptSerializer();
-            var converter = new NameJavaScriptConverter(from t in Assembly.GetExecutingAssembly().GetTypes()
-                                                        where t.IsClass && t.Namespace == "LolSpectator.Data"
-                                                        select t);
-            serializer.RegisterConverters(new JavaScriptConverter[] { converter });
-            var obj = serializer.Deserialize<T>(json);
+            jsonConverter.AddSupportedType(typeof(T));
+            var obj = jsonSerializer.Deserialize<T>(json);
             return obj;
         }
     }

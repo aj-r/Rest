@@ -32,6 +32,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -39,8 +40,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="RestClient.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\JsonSerialization\JsonSerialization.csproj">
+      <Project>{2a27274d-6eb8-48b1-b524-b8f65f9e16cf}</Project>
+      <Name>JsonSerialization</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\LolSpectator\Blowfish\Blowfish.csproj">
+      <Project>{e62a5057-c9ac-492f-a524-48926468f402}</Project>
+      <Name>Blowfish</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
