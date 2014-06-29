@@ -29,25 +29,20 @@ namespace Rest.Client
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The body in byte array format</returns>
-        public async Task<byte[]> Execute(string uri)
+        public async Task<byte[]> Execute(string uri, WebHeaderCollection customHeaders = null)
         {
             var request = WebRequest.Create(uri);
             request.Method = "GET";
+            if (customHeaders != null)
+            {
+                request.Headers = customHeaders;
+            }
             using (var response = await request.GetResponseAsync())
             using (var stream = response.GetResponseStream())
+            using (var memoryStream = new MemoryStream())
             {
-                var buffer = new byte[response.ContentLength];
-                // Read all bytes from the body
-                var offset = 0;
-                var bytesRead = 0;
-                var totalBytesRead = 0;
-                do
-                {
-                    bytesRead = stream.Read(buffer, offset, buffer.Length - offset);
-                    offset += bytesRead;
-                    totalBytesRead += bytesRead;
-                } while (totalBytesRead < buffer.Length && bytesRead > 0);
-
+                stream.CopyTo(memoryStream);
+                var buffer = memoryStream.ToArray();
                 return buffer;
             }
         }
@@ -57,9 +52,9 @@ namespace Rest.Client
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The body in string format</returns>
-        public async Task<string> ExecuteString(string uri)
+        public async Task<string> ExecuteString(string uri, WebHeaderCollection customHeaders = null)
         {
-            byte[] raw = await Execute(uri);
+            byte[] raw = await Execute(uri, customHeaders);
             var result = Encoding.UTF8.GetString(raw);
             return result;
         }
@@ -70,11 +65,11 @@ namespace Rest.Client
         /// <typeparam name="T">The type of object expected to be returned</typeparam>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The deserialized JSON object</returns>
-        public async Task<T> ExecuteJson<T>(string uri)
+        public async Task<T> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
         {
             try
             {
-                var json = await ExecuteString(uri);
+                var json = await ExecuteString(uri, customHeaders);
                 return DeserializeJson<T>(json);
             }
             catch
@@ -89,9 +84,9 @@ namespace Rest.Client
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The base-64 decoded bytes</returns>
-        public async Task<byte[]> ExecuteBase64(string uri)
+        public async Task<byte[]> ExecuteBase64(string uri, WebHeaderCollection customHeaders = null)
         {
-            var base64 = await ExecuteString(uri);
+            var base64 = await ExecuteString(uri, customHeaders);
             var bytes = Convert.FromBase64String(base64);
             // TODO: is the data in some kind of AMF format? Can we deserialize it?
             return bytes;
@@ -119,9 +114,9 @@ namespace Rest.Client
         /// <param name="uri">The full URI of the REST request</param>
         /// <param name="encryptionKey">The key used to encrypt/decrypt the data</param>
         /// <returns>The deserialized JSON object</returns>
-        public async Task<T> ExecuteEncrypted<T>(string uri, string encryptionKey)
+        public async Task<T> ExecuteEncrypted<T>(string uri, string encryptionKey, WebHeaderCollection customHeaders = null)
         {
-            byte[] encrypted = await Execute(uri);
+            byte[] encrypted = await Execute(uri, customHeaders);
             // Attemp to decrypt
             var encryptionKeyBytes = Convert.FromBase64String(encryptionKey);
             var blowfish = new Blowfish(encryptionKeyBytes);

@@ -40,7 +40,7 @@ namespace Rest.Server
             set
             {
                 name = value;
-                baseUrl = null;
+                baseUri = null;
             }
         }
         public int ParamCount { get; set; }
@@ -63,37 +63,38 @@ namespace Rest.Server
             }
         }
 
-        private string baseUrl;
+        private string baseUri;
 
-        public string BaseUrl
+        public string BaseUri
         {
             get
             {
-                if (baseUrl != null)
+                if (baseUri != null)
                 {
-                    return baseUrl;
+                    return baseUri;
                 }
-                baseUrl = Name;
-                if (string.IsNullOrEmpty(baseUrl))
+                baseUri = Name;
+                if (string.IsNullOrEmpty(baseUri))
                 {
-                    baseUrl = "/";
+                    baseUri = "/";
                 }
-                else if (!baseUrl.StartsWith("/", StringComparison.InvariantCulture))
+                else if (!baseUri.StartsWith("/", StringComparison.InvariantCulture))
                 {
-                    baseUrl = "/" + baseUrl;
+                    baseUri = "/" + baseUri;
                 }
-                return baseUrl;
+                return baseUri;
             }
         }
 
-        public RestMethodMatch TryProcess(string url, out byte[] response)
+        public RestMethodMatch TryProcess(Uri uri, out byte[] response)
         {
-            if (!url.StartsWith(BaseUrl))
+            var path = uri.PathAndQuery;
+            if (!path.StartsWith(BaseUri))
             {
                 response = null;
                 return RestMethodMatch.NameMismatch;
             }
-            var paramString = url.Substring(BaseUrl.Length);
+            var paramString = path.Substring(BaseUri.Length);
             var paramValues = paramString.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             if (paramValues.Length != ParamCount)
             {

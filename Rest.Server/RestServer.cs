@@ -111,7 +111,7 @@ namespace Rest.Server
                 byte[] response;
                 foreach (var method in Methods)
                 {
-                    RestMethodMatch match = method.TryProcess(url.AbsoluteUri, out response);
+                    RestMethodMatch match = method.TryProcess(url, out response);
                     if (match != RestMethodMatch.Success)
                     {
                         continue;
@@ -128,7 +128,11 @@ namespace Rest.Server
             catch
             {
                 // TODO: log exception
-                SendResponse(context.Response, 500);
+                try
+                {
+                    SendResponse(context.Response, 500);
+                }
+                catch { }
             }
         }
 
