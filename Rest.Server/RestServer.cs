@@ -53,6 +53,7 @@ namespace Rest.Server
         public void Stop()
         {
             stopEvent.Set();
+            listener.Close();
         }
 
         /// <summary>
@@ -99,18 +100,6 @@ namespace Rest.Server
             try
             {
                 listener.Start();
-                if (Started != null)
-                {
-                    Thread thread = new Thread(new ThreadStart(Started));
-                    thread.Start();
-                }
-                while (!stopEvent.WaitOne(0))
-                {
-                    var context = listener.GetContext();
-                    var requestThread = new Thread(() => ProcessRequest(context));
-                    requestThread.Start();
-                }
-                stopEvent.Reset();
             }
             catch (Exception ex)
             {
@@ -119,6 +108,27 @@ namespace Rest.Server
                     StartFailed(ex);
                 }
             }
+            if (Started != null)
+            {
+                Thread thread = new Thread(new ThreadStart(Started));
+                thread.Start();
+            }
+            while (!stopEvent.WaitOne(0))
+            {
+                HttpListenerContext context;
+                try
+                {
+                    context = listener.GetContext();
+                }
+                catch (HttpListenerException)
+                {
+                    // Failed to get context; potentially the connection was closed.
+                    break;
+                }
+                var requestThread = new Thread(() => ProcessRequest(context));
+                requestThread.Start();
+            }
+            stopEvent.Reset();
         }
 
         private void ProcessRequest(HttpListenerContext context)
