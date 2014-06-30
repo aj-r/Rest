@@ -27,6 +27,9 @@ namespace Rest.Server
         /// </summary>
         public List<RestMethod> Methods { get; private set; }
 
+        public event Action<Exception> StartFailed;
+        public event Action Started;
+
         private HttpListener listener;
         private Thread listenThread;
         private ManualResetEvent stopEvent = new ManualResetEvent(false);
@@ -93,14 +96,29 @@ namespace Rest.Server
 
         private void Listen()
         {
-            listener.Start();
-            while (!stopEvent.WaitOne(0))
+            try
             {
-                var context = listener.GetContext();
-                var requestThread = new Thread(() => ProcessRequest(context));
-                requestThread.Start();
+                listener.Start();
+                if (Started != null)
+                {
+                    Thread thread = new Thread(new ThreadStart(Started));
+                    thread.Start();
+                }
+                while (!stopEvent.WaitOne(0))
+                {
+                    var context = listener.GetContext();
+                    var requestThread = new Thread(() => ProcessRequest(context));
+                    requestThread.Start();
+                }
+                stopEvent.Reset();
             }
-            stopEvent.Reset();
+            catch (Exception ex)
+            {
+                if (StartFailed != null)
+                {
+                    StartFailed(ex);
+                }
+            }
         }
 
         private void ProcessRequest(HttpListenerContext context)
