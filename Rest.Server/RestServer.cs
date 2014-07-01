@@ -29,6 +29,7 @@ namespace Rest.Server
 
         public event Action<Exception> StartFailed;
         public event Action Started;
+        public event Action Stopped;
 
         private HttpListener listener;
         private Thread listenThread;
@@ -54,6 +55,30 @@ namespace Rest.Server
         {
             stopEvent.Set();
             listener.Close();
+        }
+
+        protected virtual void OnStarted()
+        {
+            if (Started != null)
+            {
+                Started();
+            }
+        }
+
+        protected virtual void OnStartFailed(Exception ex)
+        {
+            if (StartFailed != null)
+            {
+                StartFailed(ex);
+            }
+        }
+
+        protected virtual void OnStopped()
+        {
+            if (Stopped != null)
+            {
+                Stopped();
+            }
         }
 
         /// <summary>
@@ -103,14 +128,11 @@ namespace Rest.Server
             }
             catch (Exception ex)
             {
-                if (StartFailed != null)
-                {
-                    StartFailed(ex);
-                }
+                OnStartFailed(ex);
             }
             if (Started != null)
             {
-                Thread thread = new Thread(new ThreadStart(Started));
+                Thread thread = new Thread(new ThreadStart(OnStarted));
                 thread.Start();
             }
             while (!stopEvent.WaitOne(0))
@@ -129,6 +151,7 @@ namespace Rest.Server
                 requestThread.Start();
             }
             stopEvent.Reset();
+            OnStopped();
         }
 
         private void ProcessRequest(HttpListenerContext context)
