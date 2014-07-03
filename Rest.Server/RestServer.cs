@@ -147,6 +147,11 @@ namespace Rest.Server
                     // Failed to get context; potentially the connection was closed.
                     break;
                 }
+                catch (ObjectDisposedException)
+                {
+                    // Failed to get context; potentially the connection was closed.
+                    break;
+                }
                 var requestThread = new Thread(() => ProcessRequest(context));
                 requestThread.Start();
             }

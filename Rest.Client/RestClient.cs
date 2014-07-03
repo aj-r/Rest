@@ -7,6 +7,8 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
+using System.Xml;
+using System.Xml.Serialization;
 using BlowfishCrypto;
 using JsonSerialization;
 
@@ -80,6 +82,46 @@ namespace Rest.Client
         }
 
         /// <summary>
+        /// Executes a REST request and parses the body as JSON.
+        /// </summary>
+        /// <typeparam name="T">The type of object expected to be returned</typeparam>
+        /// <param name="uri">The full URI of the REST request</param>
+        /// <returns>The deserialized JSON object</returns>
+        public async Task<T> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
+        {
+            try
+            {
+                var json = await ExecuteString(uri, customHeaders);
+                return DeserializeJson<T>(json);
+            }
+            catch
+            {
+                // TODO: log exception
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Executes a REST request and parses the body as XML.
+        /// </summary>
+        /// <typeparam name="T">The type of object expected to be returned</typeparam>
+        /// <param name="uri">The full URI of the REST request</param>
+        /// <returns>The deserialized JSON object</returns>
+        public async Task<T> ExecuteXml<T>(string uri, WebHeaderCollection customHeaders = null)
+        {
+            try
+            {
+                var json = await ExecuteString(uri, customHeaders);
+                return DeserializeXml<T>(json);
+            }
+            catch
+            {
+                // TODO: log exception
+                return default(T);
+            }
+        }
+
+        /// <summary>
         /// Executes a REST request and decodes the body as base-64
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
@@ -91,62 +133,28 @@ namespace Rest.Client
             // TODO: is the data in some kind of AMF format? Can we deserialize it?
             return bytes;
         }
-        /*
-        /// <summary>
-        /// Executes a REST request, decodes the body as base-64, and parses the result as AMF (?).
-        /// </summary>
-        /// <typeparam name="T">The type of object expected to be returned</typeparam>
-        /// <param name="uri">The full URI of the REST request</param>
-        /// <returns>The deserialized AMF object</returns>
-        public async Task<T> ExecuteBase64<T>(string uri)
-        {
-            var base64 = await ExecuteString(uri);
-            var bytes = Convert.FromBase64String(base64);
-            var amf = Encoding.UTF8.GetString(bytes);
-            return DeserializeAmf<T>(amf);
-        }
-        */
-        /// <summary>
-        /// Executes a REST request, decrypts and decompresses the body, and parses the result as JSON.
-        /// NOTE: this method is not currently working, nor should it be used.
-        /// </summary>
-        /// <typeparam name="T">The type of object expected to be returned</typeparam>
-        /// <param name="uri">The full URI of the REST request</param>
-        /// <param name="encryptionKey">The key used to encrypt/decrypt the data</param>
-        /// <returns>The deserialized JSON object</returns>
-        public async Task<T> ExecuteEncrypted<T>(string uri, string encryptionKey, WebHeaderCollection customHeaders = null)
-        {
-            byte[] encrypted = await Execute(uri, customHeaders);
-            // Attemp to decrypt
-            var encryptionKeyBytes = Convert.FromBase64String(encryptionKey);
-            var blowfish = new Blowfish(encryptionKeyBytes);
-            // TODO: should there be an IV? What part of the data contains the IV? Assume it is at the start...
-            var iv = new byte[8];
-            var data = new byte[encrypted.Length - iv.Length];
-            Array.Copy(encrypted, 0, iv, 0, iv.Length);
-            Array.Copy(encrypted, iv.Length, data, 0, data.Length);
-            //blowfish.IV = iv;
-            byte[] decrypted = blowfish.Decrypt_ECB(encrypted);
-            string s = Encoding.UTF8.GetString(decrypted);// for testing
-
-            // Decompress
-            using (var stream = new MemoryStream(decrypted))
-            using (var zip = new GZipStream(stream, CompressionMode.Decompress))
-            using (var reader = new StreamReader(zip))
-            {
-                string json = reader.ReadToEnd();
-                return DeserializeJson<T>(json);
-            }
-        }
-
+        
         /// <summary>
         /// Converts a JSON string to a CLR object
         /// </summary>
         private T DeserializeJson<T>(string json)
         {
-            // Convert json string to CLR object
             jsonConverter.AddSupportedType(typeof(T));
             var obj = jsonSerializer.Deserialize<T>(json);
+            return obj;
+        }
+
+        /// <summary>
+        /// Converts an XML string to a CLR object
+        /// </summary>
+        private T DeserializeXml<T>(string xml)
+        {
+            var serializer = new XmlSerializer(typeof(T));
+            T obj;
+            using (var reader = new StringReader(xml))
+            {
+                obj = (T)serializer.Deserialize(reader);
+            }
             return obj;
         }
     }
