@@ -7,7 +7,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
-using System.Xml;
 using System.Xml.Serialization;
 using BlowfishCrypto;
 using JsonSerialization;
@@ -59,26 +58,6 @@ namespace Rest.Client
             byte[] raw = await Execute(uri, customHeaders);
             var result = Encoding.UTF8.GetString(raw);
             return result;
-        }
-
-        /// <summary>
-        /// Executes a REST request and parses the body as JSON.
-        /// </summary>
-        /// <typeparam name="T">The type of object expected to be returned</typeparam>
-        /// <param name="uri">The full URI of the REST request</param>
-        /// <returns>The deserialized JSON object</returns>
-        public async Task<T> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
-        {
-            try
-            {
-                var json = await ExecuteString(uri, customHeaders);
-                return DeserializeJson<T>(json);
-            }
-            catch
-            {
-                // TODO: log exception
-                return default(T);
-            }
         }
 
         /// <summary>
