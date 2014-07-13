@@ -122,6 +122,7 @@ namespace Rest.Server
 
         private void Listen()
         {
+            stopEvent.Reset();
             try
             {
                 listener.Start();
@@ -129,6 +130,7 @@ namespace Rest.Server
             catch (Exception ex)
             {
                 OnStartFailed(ex);
+                return;
             }
             if (Started != null)
             {
@@ -155,7 +157,6 @@ namespace Rest.Server
                 var requestThread = new Thread(() => ProcessRequest(context));
                 requestThread.Start();
             }
-            stopEvent.Reset();
             OnStopped();
         }
 
