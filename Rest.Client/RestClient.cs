@@ -38,13 +38,26 @@ namespace Rest.Client
             {
                 request.Headers = customHeaders;
             }
-            using (var response = await request.GetResponseAsync())
-            using (var stream = response.GetResponseStream())
-            using (var memoryStream = new MemoryStream())
+            try
             {
-                stream.CopyTo(memoryStream);
-                var buffer = memoryStream.ToArray();
-                return buffer;
+                using (var response = await request.GetResponseAsync())
+                using (var stream = response.GetResponseStream())
+                using (var memoryStream = new MemoryStream())
+                {
+                    stream.CopyTo(memoryStream);
+                    var buffer = memoryStream.ToArray();
+                    return buffer;
+                }
+            }
+            catch (WebException ex)
+            {
+                using (var stream = ex.Response.GetResponseStream())
+                using (var memoryStream = new MemoryStream())
+                {
+                    stream.CopyTo(memoryStream);
+                    var buffer = memoryStream.ToArray();
+                    return buffer;
+                }
             }
         }
 
