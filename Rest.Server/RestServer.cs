@@ -31,6 +31,11 @@ namespace Rest.Server
         public event Action Started;
         public event Action Stopped;
 
+        /// <summary>
+        /// Occurs when there was an internal error processing a request.
+        /// </summary>
+        public event RequestErrorEventHandler RequestError;
+
         private HttpListener listener;
         private Thread listenThread;
         private ManualResetEvent stopEvent = new ManualResetEvent(false);
@@ -60,25 +65,25 @@ namespace Rest.Server
         protected virtual void OnStarted()
         {
             if (Started != null)
-            {
                 Started();
-            }
         }
 
         protected virtual void OnStartFailed(Exception ex)
         {
             if (StartFailed != null)
-            {
                 StartFailed(ex);
-            }
         }
 
         protected virtual void OnStopped()
         {
             if (Stopped != null)
-            {
                 Stopped();
-            }
+        }
+
+        protected virtual void OnRequestError(RequestErrorEventArgs e)
+        {
+            if (RequestError != null)
+                RequestError(this, e);
         }
 
         /// <summary>
@@ -162,13 +167,14 @@ namespace Rest.Server
 
         private void ProcessRequest(HttpListenerContext context)
         {
+            Uri uri = null;
             try
             {
-                var url = context.Request.Url;
+                uri = context.Request.Url;
                 byte[] response;
                 foreach (var method in Methods)
                 {
-                    RestMethodMatch match = method.TryProcess(url, out response);
+                    RestMethodMatch match = method.TryProcess(uri, out response);
                     if (match != RestMethodMatch.Success)
                     {
                         continue;
@@ -182,9 +188,13 @@ namespace Rest.Server
                 // No matching method found
                 SendResponse(context.Response, 404);
             }
-            catch
+            catch (Exception ex)
             {
-                // TODO: log exception
+                try
+                {
+                    OnRequestError(new RequestErrorEventArgs(uri, ex));
+                }
+                catch { }
                 try
                 {
                     SendResponse(context.Response, 500);
@@ -193,7 +203,7 @@ namespace Rest.Server
             }
         }
 
-        private void SendResponse(HttpListenerResponse response, int status)
+        protected virtual void SendResponse(HttpListenerResponse response, int status)
         {
             response.StatusCode = status;
             response.StatusDescription = HttpWorkerRequest.GetStatusDescription(response.StatusCode);
