@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Xml.Serialization;
-using BlowfishCrypto;
 using JsonSerialization;
 
 namespace Rest.Client
