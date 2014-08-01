@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Xml.Serialization;
 using JsonSerialization;
+using Rest.Common;
 
 namespace Rest.Client
 {
@@ -16,6 +17,8 @@ namespace Rest.Client
     {
         private static JavaScriptSerializer jsonSerializer;
         private static NameJavaScriptConverter jsonConverter;
+
+        public event RequestErrorEventHandler RequestError;
 
         static RestClient()
         {
@@ -31,32 +34,43 @@ namespace Rest.Client
         /// <returns>The body in byte array format</returns>
         public async Task<byte[]> Execute(string uri, WebHeaderCollection customHeaders = null)
         {
-            var request = WebRequest.Create(uri);
-            request.Method = "GET";
-            if (customHeaders != null)
-            {
-                request.Headers = customHeaders;
-            }
             try
             {
-                using (var response = await request.GetResponseAsync())
-                using (var stream = response.GetResponseStream())
-                using (var memoryStream = new MemoryStream())
+                var request = WebRequest.Create(uri);
+                request.Method = "GET";
+                if (customHeaders != null)
                 {
-                    stream.CopyTo(memoryStream);
-                    var buffer = memoryStream.ToArray();
-                    return buffer;
+                    request.Headers = customHeaders;
+                }
+                try
+                {
+                    using (var response = await request.GetResponseAsync())
+                    using (var stream = response.GetResponseStream())
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        stream.CopyTo(memoryStream);
+                        var buffer = memoryStream.ToArray();
+                        return buffer;
+                    }
+                }
+                catch (WebException ex)
+                {
+                    using (var stream = ex.Response.GetResponseStream())
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        stream.CopyTo(memoryStream);
+                        var buffer = memoryStream.ToArray();
+                        return buffer;
+                    }
                 }
             }
-            catch (WebException ex)
+            catch (Exception ex)
             {
-                using (var stream = ex.Response.GetResponseStream())
-                using (var memoryStream = new MemoryStream())
-                {
-                    stream.CopyTo(memoryStream);
-                    var buffer = memoryStream.ToArray();
-                    return buffer;
-                }
+                Uri actualUri = null;
+                try { actualUri = new Uri(uri); }
+                catch { }
+                OnRequestError(new RequestErrorEventArgs(actualUri, ex));
+                return null;
             }
         }
 
@@ -68,8 +82,21 @@ namespace Rest.Client
         public async Task<string> ExecuteString(string uri, WebHeaderCollection customHeaders = null)
         {
             byte[] raw = await Execute(uri, customHeaders);
-            var result = Encoding.UTF8.GetString(raw);
-            return result;
+            if (raw == null)
+                return null;
+            try
+            {
+                var result = Encoding.UTF8.GetString(raw);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Uri actualUri = null;
+                try { actualUri = new Uri(uri); }
+                catch { }
+                OnRequestError(new RequestErrorEventArgs(actualUri, ex));
+                return null;
+            }
         }
 
         /// <summary>
@@ -80,14 +107,19 @@ namespace Rest.Client
         /// <returns>The deserialized JSON object</returns>
         public async Task<T> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
         {
+            var json = await ExecuteString(uri, customHeaders);
+            if (json == null)
+                return default(T);
             try
             {
-                var json = await ExecuteString(uri, customHeaders);
                 return DeserializeJson<T>(json);
             }
-            catch
+            catch (Exception ex)
             {
-                // TODO: log exception
+                Uri actualUri = null;
+                try { actualUri = new Uri(uri); }
+                catch { }
+                OnRequestError(new RequestErrorEventArgs(actualUri, ex));
                 return default(T);
             }
         }
@@ -100,14 +132,19 @@ namespace Rest.Client
         /// <returns>The deserialized JSON object</returns>
         public async Task<T> ExecuteXml<T>(string uri, WebHeaderCollection customHeaders = null)
         {
+            var json = await ExecuteString(uri, customHeaders);
+            if (json == null)
+                return default(T);
             try
             {
-                var json = await ExecuteString(uri, customHeaders);
                 return DeserializeXml<T>(json);
             }
-            catch
+            catch (Exception ex)
             {
-                // TODO: log exception
+                Uri actualUri = null;
+                try { actualUri = new Uri(uri); }
+                catch { }
+                OnRequestError(new RequestErrorEventArgs(actualUri, ex));
                 return default(T);
             }
         }
@@ -120,9 +157,21 @@ namespace Rest.Client
         public async Task<byte[]> ExecuteBase64(string uri, WebHeaderCollection customHeaders = null)
         {
             var base64 = await ExecuteString(uri, customHeaders);
-            var bytes = Convert.FromBase64String(base64);
-            // TODO: is the data in some kind of AMF format? Can we deserialize it?
-            return bytes;
+            if (base64 == null)
+                return null;
+            try
+            {
+                var bytes = Convert.FromBase64String(base64);
+                return bytes;
+            }
+            catch (Exception ex)
+            {
+                Uri actualUri = null;
+                try { actualUri = new Uri(uri); }
+                catch { }
+                OnRequestError(new RequestErrorEventArgs(actualUri, ex));
+                return null;
+            }
         }
         
         /// <summary>
@@ -147,6 +196,12 @@ namespace Rest.Client
                 obj = (T)serializer.Deserialize(reader);
             }
             return obj;
+        }
+
+        protected virtual void OnRequestError(RequestErrorEventArgs e)
+        {
+            if (RequestError != null)
+                RequestError(this, e);
         }
     }
 }

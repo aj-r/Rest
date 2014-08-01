@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Rest.Server
+namespace Rest.Common
 {
     public delegate void RequestErrorEventHandler(object sender, RequestErrorEventArgs e);
 

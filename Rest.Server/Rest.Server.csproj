@@ -44,7 +44,12 @@
     <Compile Include="RestMethod.cs" />
     <Compile Include="RestMethodAttribute.cs" />
     <Compile Include="RestServer.cs" />
-    <Compile Include="RequestErrorEventArgs.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rest.Common\Rest.Common.csproj">
+      <Project>{2874d6f8-b93e-4a7b-aecc-21786a0205a7}</Project>
+      <Name>Rest.Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
