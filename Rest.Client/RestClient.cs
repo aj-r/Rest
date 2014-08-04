@@ -32,7 +32,7 @@ namespace Rest.Client
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The body in byte array format</returns>
-        public async Task<byte[]> Execute(string uri, WebHeaderCollection customHeaders = null)
+        public async Task<WebResult<byte[]>> Execute(string uri, WebHeaderCollection customHeaders = null)
         {
             try
             {
@@ -44,23 +44,26 @@ namespace Rest.Client
                 }
                 try
                 {
-                    using (var response = await request.GetResponseAsync())
+                    using (var response = (HttpWebResponse)(await request.GetResponseAsync()))
                     using (var stream = response.GetResponseStream())
                     using (var memoryStream = new MemoryStream())
                     {
                         stream.CopyTo(memoryStream);
                         var buffer = memoryStream.ToArray();
-                        return buffer;
+                        return new WebResult<byte[]>((int)response.StatusCode, response.ContentType, buffer);
                     }
                 }
                 catch (WebException ex)
                 {
-                    using (var stream = ex.Response.GetResponseStream())
+                    var response = (HttpWebResponse)ex.Response;
+                    using (var stream = response.GetResponseStream())
                     using (var memoryStream = new MemoryStream())
                     {
+                        if (ex.Response == null)
+                            return new WebResult<byte[]>(0, null, new byte[0]);
                         stream.CopyTo(memoryStream);
                         var buffer = memoryStream.ToArray();
-                        return buffer;
+                        return new WebResult<byte[]>((int)response.StatusCode, response.ContentType, buffer);
                     }
                 }
             }
@@ -70,7 +73,7 @@ namespace Rest.Client
                 try { actualUri = new Uri(uri); }
                 catch { }
                 OnRequestError(new RequestErrorEventArgs(actualUri, ex));
-                return null;
+                return new WebResult<byte[]>(0, null, new byte[0]);
             }
         }
 
@@ -79,15 +82,14 @@ namespace Rest.Client
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The body in string format</returns>
-        public async Task<string> ExecuteString(string uri, WebHeaderCollection customHeaders = null)
+        public async Task<WebResult<string>> ExecuteString(string uri, WebHeaderCollection customHeaders = null)
         {
-            byte[] raw = await Execute(uri, customHeaders);
-            if (raw == null)
-                return null;
+            var result = await Execute(uri, customHeaders);
             try
             {
-                var result = Encoding.UTF8.GetString(raw);
-                return result;
+                byte[] raw = result.Value;
+                var value = Encoding.UTF8.GetString(raw);
+                return new WebResult<string>(result.StatusCode, result.ContentType, value);
             }
             catch (Exception ex)
             {
@@ -95,7 +97,7 @@ namespace Rest.Client
                 try { actualUri = new Uri(uri); }
                 catch { }
                 OnRequestError(new RequestErrorEventArgs(actualUri, ex));
-                return null;
+                return new WebResult<string>(0, null, string.Empty);
             }
         }
 
@@ -105,14 +107,17 @@ namespace Rest.Client
         /// <typeparam name="T">The type of object expected to be returned</typeparam>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The deserialized JSON object</returns>
-        public async Task<T> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
+        public async Task<WebResult<T>> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
         {
-            var json = await ExecuteString(uri, customHeaders);
-            if (json == null)
-                return default(T);
+            var result = await ExecuteString(uri, customHeaders);
+            if (result.StatusCode != 200)
+                return new WebResult<T>(result.StatusCode, result.ContentType, default(T));
+
             try
             {
-                return DeserializeJson<T>(json);
+                var json = result.Value;
+                var value = DeserializeJson<T>(json);
+                return new WebResult<T>(result.StatusCode, result.ContentType, value);
             }
             catch (Exception ex)
             {
@@ -120,7 +125,7 @@ namespace Rest.Client
                 try { actualUri = new Uri(uri); }
                 catch { }
                 OnRequestError(new RequestErrorEventArgs(actualUri, ex));
-                return default(T);
+                return new WebResult<T>();
             }
         }
 
@@ -130,14 +135,17 @@ namespace Rest.Client
         /// <typeparam name="T">The type of object expected to be returned</typeparam>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The deserialized JSON object</returns>
-        public async Task<T> ExecuteXml<T>(string uri, WebHeaderCollection customHeaders = null)
+        public async Task<WebResult<T>> ExecuteXml<T>(string uri, WebHeaderCollection customHeaders = null)
         {
-            var json = await ExecuteString(uri, customHeaders);
-            if (json == null)
-                return default(T);
+            var result = await ExecuteString(uri, customHeaders);
+            if (result.StatusCode != 200)
+                return new WebResult<T>(result.StatusCode, result.ContentType, default(T));
+
             try
             {
-                return DeserializeXml<T>(json);
+                var json = result.Value;
+                var value = DeserializeXml<T>(json);
+                return new WebResult<T>(result.StatusCode, result.ContentType, value);
             }
             catch (Exception ex)
             {
@@ -145,7 +153,7 @@ namespace Rest.Client
                 try { actualUri = new Uri(uri); }
                 catch { }
                 OnRequestError(new RequestErrorEventArgs(actualUri, ex));
-                return default(T);
+                return new WebResult<T>();
             }
         }
 
@@ -154,15 +162,17 @@ namespace Rest.Client
         /// </summary>
         /// <param name="uri">The full URI of the REST request</param>
         /// <returns>The base-64 decoded bytes</returns>
-        public async Task<byte[]> ExecuteBase64(string uri, WebHeaderCollection customHeaders = null)
+        public async Task<WebResult<byte[]>> ExecuteBase64(string uri, WebHeaderCollection customHeaders = null)
         {
-            var base64 = await ExecuteString(uri, customHeaders);
-            if (base64 == null)
-                return null;
+            var result = await ExecuteString(uri, customHeaders);
+            if (result.StatusCode != 200)
+                return new WebResult<byte[]>(result.StatusCode, result.ContentType, new byte[0]);
+
             try
             {
+                var base64 = result.Value;
                 var bytes = Convert.FromBase64String(base64);
-                return bytes;
+                return new WebResult<byte[]>(result.StatusCode, result.ContentType, bytes);
             }
             catch (Exception ex)
             {
@@ -170,7 +180,7 @@ namespace Rest.Client
                 try { actualUri = new Uri(uri); }
                 catch { }
                 OnRequestError(new RequestErrorEventArgs(actualUri, ex));
-                return null;
+                return new WebResult<byte[]>(0, null, new byte[0]);
             }
         }
         
