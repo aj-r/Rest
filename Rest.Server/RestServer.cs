@@ -18,9 +18,11 @@ namespace Rest.Server
     {
         public RestServer(int port)
         {
+            if (port <= 0 || port > 65535)
+                throw new ArgumentException("Port must be between 1 and 65535.", "port");
             Methods = new List<RestMethod>();
-            listener = new HttpListener();
-            listener.Prefixes.Add(string.Format("http://*:{0}/", port));
+            Port = port;
+            RegisterMethods(this);
         }
 
         /// <summary>
@@ -41,11 +43,27 @@ namespace Rest.Server
         private Thread listenThread;
         private ManualResetEvent stopEvent = new ManualResetEvent(false);
 
+        private int port;
+
+        public int Port
+        {
+            get { return port; }
+            protected set
+            {
+                if (IsRunning)
+                    throw new InvalidOperationException("Cannot change port while server is running.");
+                port = value;
+            }
+        }
+        public bool IsRunning { get; private set; }
+
         /// <summary>
         /// Starts the server.
         /// </summary>
         public void Start()
         {
+            if (IsRunning)
+                return;
             if (!HttpListener.IsSupported)
             {
                 throw new NotSupportedException("HTTP listeners are not supported on your computer. Windows XP SP2 or later is required.");
@@ -59,6 +77,8 @@ namespace Rest.Server
         /// </summary>
         public void Stop()
         {
+            if (!IsRunning)
+                return;
             stopEvent.Set();
             listener.Close();
         }
@@ -71,12 +91,14 @@ namespace Rest.Server
 
         protected virtual void OnStartFailed(Exception ex)
         {
+            IsRunning = false;
             if (StartFailed != null)
                 StartFailed(ex);
         }
 
         protected virtual void OnStopped()
         {
+            IsRunning = false;
             if (Stopped != null)
                 Stopped();
         }
@@ -109,6 +131,11 @@ namespace Rest.Server
                     ParamCount = attr.ParamCount,
                     ContentType = attr.ContentType,
                 };
+                var parameters = method.GetParameters();
+                if (parameters.Length != 1 || parameters[0].ParameterType != typeof(string[]))
+                {
+                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid argments. Must have a single argument of String Array (String[]) type.");
+                }
                 if (method.ReturnType == typeof(byte[]))
                 {
                     restMethod.Handler = (RawRestHandler)method.CreateDelegate(typeof(RawRestHandler), obj);
@@ -120,7 +147,7 @@ namespace Rest.Server
                 }
                 else
                 {
-                    throw new Exception("Invalid return type for RestHandler method '{0}': invalid return type. Must be String or Byte[].");
+                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid return type. Must be String or Byte Array (Byte[]).");
                 }
                 Methods.Add(restMethod);
             }
@@ -129,6 +156,9 @@ namespace Rest.Server
         private void Listen()
         {
             stopEvent.Reset();
+            IsRunning = true;
+            listener = new HttpListener();
+            listener.Prefixes.Add(string.Format("http://*:{0}/", port));
             try
             {
                 listener.Start();
