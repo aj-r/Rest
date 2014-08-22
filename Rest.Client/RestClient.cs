@@ -56,6 +56,8 @@ namespace Rest.Client
                 catch (WebException ex)
                 {
                     var response = (HttpWebResponse)ex.Response;
+                    if (response == null)
+                        throw;
                     using (var stream = response.GetResponseStream())
                     using (var memoryStream = new MemoryStream())
                     {

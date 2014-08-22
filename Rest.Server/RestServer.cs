@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -23,6 +24,11 @@ namespace Rest.Server
             Methods = new List<RestMethod>();
             Port = port;
             RegisterMethods(this);
+        }
+
+        ~RestServer()
+        {
+            Stop();
         }
 
         /// <summary>
@@ -125,25 +131,43 @@ namespace Rest.Server
                     // Not a REST method.
                     continue;
                 }
+                var parameters = method.GetParameters();
+                if (parameters.Length < 1 || parameters.Length > 2 || parameters[0].ParameterType != typeof(string[]))
+                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid argments. Must have a single argument of String Array (String[]) type.");
+                bool isPost = parameters.Length == 2;
+                if (isPost && parameters[0].ParameterType != typeof(string))
+                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid argments. Second argument must be of String type.");
                 var restMethod = new RestMethod
                 {
                     Name = (attr.Name == null ? method.Name.ToLower() : attr.Name),
                     ParamCount = attr.ParamCount,
                     ContentType = attr.ContentType,
+                    Verb = isPost ? "POST" : "GET"
                 };
-                var parameters = method.GetParameters();
-                if (parameters.Length != 1 || parameters[0].ParameterType != typeof(string[]))
-                {
-                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid argments. Must have a single argument of String Array (String[]) type.");
-                }
                 if (method.ReturnType == typeof(byte[]))
                 {
-                    restMethod.Handler = (RawRestHandler)method.CreateDelegate(typeof(RawRestHandler), obj);
+                    if (isPost)
+                    {
+                        restMethod.Handler = (RawRestPostHandler)method.CreateDelegate(typeof(RawRestPostHandler), obj);
+                    }
+                    else
+                    {
+                        var handler = (RawRestHandler)method.CreateDelegate(typeof(RawRestHandler), obj);
+                        restMethod.Handler = (args, body) => handler(args);
+                    }
                 }
                 else if (method.ReturnType == typeof(string))
                 {
-                    var handler = (RestHandler)method.CreateDelegate(typeof(RestHandler), obj);
-                    restMethod.Handler = (args) => Encoding.UTF8.GetBytes(handler(args));
+                    if (isPost)
+                    {
+                        var handler = (RestPostHandler)method.CreateDelegate(typeof(RestPostHandler), obj);
+                        restMethod.Handler = (args, body) => Encoding.UTF8.GetBytes(handler(args, body));
+                    }
+                    else
+                    {
+                        var handler = (RestHandler)method.CreateDelegate(typeof(RestHandler), obj);
+                        restMethod.Handler = (args, body) => Encoding.UTF8.GetBytes(handler(args));
+                    }
                 }
                 else
                 {
@@ -202,14 +226,17 @@ namespace Rest.Server
             try
             {
                 uri = context.Request.Url;
+                string body = string.Empty;
+                string verb = context.Request.HttpMethod.ToUpper();
+                if (verb == "POST")
+                    using (var reader = new StreamReader(context.Request.InputStream))
+                        body = reader.ReadToEnd();
                 byte[] response;
-                foreach (var method in Methods)
+                foreach (var method in Methods.Where(m => m.Verb == verb))
                 {
-                    RestMethodMatch match = method.TryProcess(uri, out response);
+                    RestMethodMatch match = method.TryProcess(uri, body, out response);
                     if (match != RestMethodMatch.Success)
-                    {
                         continue;
-                    }
                     context.Response.ContentType = method.ContentType;
                     context.Response.ContentLength64 = response.Length;
                     context.Response.OutputStream.Write(response, 0, response.Length);

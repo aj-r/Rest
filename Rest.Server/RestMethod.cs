@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Net;
 
 namespace Rest.Server
 {
@@ -27,9 +24,16 @@ namespace Rest.Server
 
     public delegate string RestHandler(string[] args);
     public delegate byte[] RawRestHandler(string[] args);
+    public delegate string RestPostHandler(string[] args, string body);
+    public delegate byte[] RawRestPostHandler(string[] args, string body);
 
     public class RestMethod
     {
+        public RestMethod()
+        {
+            Verb = "GET";
+        }
+
         private string name;
         public string Name
         {
@@ -43,8 +47,9 @@ namespace Rest.Server
                 baseUri = null;
             }
         }
+        public string Verb { get; set; }
         public int ParamCount { get; set; }
-        public RawRestHandler Handler { get; set; }
+        public RawRestPostHandler Handler { get; set; }
 
         private string _contentType;
         public string ContentType
@@ -86,7 +91,7 @@ namespace Rest.Server
             }
         }
 
-        public RestMethodMatch TryProcess(Uri uri, out byte[] response)
+        public RestMethodMatch TryProcess(Uri uri, string body, out byte[] response)
         {
             var path = uri.PathAndQuery;
             if (!path.StartsWith(BaseUri))
@@ -101,7 +106,8 @@ namespace Rest.Server
                 response = null;
                 return RestMethodMatch.ParamMismatch;
             }
-            response = Handler(paramValues);
+            // TODO: enforce a time limit on the handler which can be overridden in the RestMethodAttribute
+            response = Handler(paramValues, body);
             return RestMethodMatch.Success;
         }
     }
