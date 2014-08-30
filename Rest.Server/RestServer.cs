@@ -131,15 +131,16 @@ namespace Rest.Server
                     // Not a REST method.
                     continue;
                 }
+                var methodName =(attr.Name == null ? method.Name.ToLower() : attr.Name);
                 var parameters = method.GetParameters();
                 if (parameters.Length < 1 || parameters.Length > 2 || parameters[0].ParameterType != typeof(string[]))
-                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid argments. Must have a single argument of String Array (String[]) type.");
+                    throw new Exception(string.Format("Invalid signature for RestHandler method '{0}': invalid argments. Must have a single argument of String Array (String[]) type.", methodName));
                 bool isPost = parameters.Length == 2;
-                if (isPost && parameters[0].ParameterType != typeof(string))
-                    throw new Exception("Invalid signature for RestHandler method '{0}': invalid argments. Second argument must be of String type.");
+                if (isPost && parameters[1].ParameterType != typeof(string))
+                    throw new Exception(string.Format("Invalid signature for RestHandler method '{0}': invalid argments. Second argument must be of String type.", methodName));
                 var restMethod = new RestMethod
                 {
-                    Name = (attr.Name == null ? method.Name.ToLower() : attr.Name),
+                    Name = methodName,
                     ParamCount = attr.ParamCount,
                     ContentType = attr.ContentType,
                     Verb = isPost ? "POST" : "GET"
