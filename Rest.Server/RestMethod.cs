@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net;
 
 namespace Rest.Server
@@ -94,13 +95,13 @@ namespace Rest.Server
         public RestMethodMatch TryProcess(Uri uri, string body, out byte[] response)
         {
             var path = uri.PathAndQuery;
-            if (!path.StartsWith(BaseUri))
+            if (!path.Equals(BaseUri) && !path.StartsWith(BaseUri + "/"))
             {
                 response = null;
                 return RestMethodMatch.NameMismatch;
             }
             var paramString = path.Substring(BaseUri.Length);
-            var paramValues = paramString.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var paramValues = paramString.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries).Select(p => Uri.UnescapeDataString(p)).ToArray();
             if (paramValues.Length != ParamCount)
             {
                 response = null;
