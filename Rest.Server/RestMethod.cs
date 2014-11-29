@@ -1,28 +1,10 @@
 ﻿using System;
 using System.Linq;
 using System.Net;
+using System.Threading;
 
 namespace Rest.Server
 {
-    /// <summary>
-    /// Indicates how a uri matches or does not match the method signature.
-    /// </summary>
-    public enum RestMethodMatch
-    {
-        /// <summary>
-        /// The uri matches the method signature.
-        /// </summary>
-        Success,
-        /// <summary>
-        /// The uri does not the method signature because the name is incorrect.
-        /// </summary>
-        NameMismatch,
-        /// <summary>
-        /// The uri does not the method signature because the wrong number of parameters are present.
-        /// </summary>
-        ParamMismatch
-    }
-
     public delegate string RestHandler(string[] args);
     public delegate byte[] RawRestHandler(string[] args);
     public delegate string RestPostHandler(string[] args, string body);
@@ -33,9 +15,14 @@ namespace Rest.Server
         public RestMethod()
         {
             Verb = "GET";
+            MillisecondsTimeout = -1;
         }
 
         private string name;
+
+        /// <summary>
+        /// Gets or sets the name of the method used in the request URI. Can contain slashes (/). If this is not specified, the name of the CLR method is used.
+        /// </summary>
         public string Name
         {
             get
@@ -48,11 +35,20 @@ namespace Rest.Server
                 baseUri = null;
             }
         }
+
         public string Verb { get; set; }
+
+        /// <summary>
+        /// Gets or sets the minimum number of arguments that must be passed to this function. If MaxParamCount is not specified, then this is also the maximum number of arguments.
+        /// </summary>
         public int ParamCount { get; set; }
         public RawRestPostHandler Handler { get; set; }
 
         private string _contentType;
+
+        /// <summary>
+        /// Gets or sets the Content-Type of the data returned by this function.
+        /// </summary>
         public string ContentType
         {
             get
@@ -92,24 +88,13 @@ namespace Rest.Server
             }
         }
 
-        public RestMethodMatch TryProcess(Uri uri, string body, out byte[] response)
-        {
-            var path = uri.PathAndQuery;
-            if (!path.Equals(BaseUri) && !path.StartsWith(BaseUri + "/"))
-            {
-                response = null;
-                return RestMethodMatch.NameMismatch;
-            }
-            var paramString = path.Substring(BaseUri.Length);
-            var paramValues = paramString.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries).Select(p => Uri.UnescapeDataString(p)).ToArray();
-            if (paramValues.Length != ParamCount)
-            {
-                response = null;
-                return RestMethodMatch.ParamMismatch;
-            }
-            // TODO: enforce a time limit on the handler which can be overridden in the RestMethodAttribute
-            response = Handler(paramValues, body);
-            return RestMethodMatch.Success;
-        }
+        /// <summary>
+        /// Gets or sets the maximum time in milliseconds for the server to wait for the method to process.
+        /// </summary>
+        /// <remarks>
+        /// If the timeout expires, the RequestError event will be raised with an OperationCancelledException as the Exception for the event.
+        /// A value of -1 specifies an infinite wait time.
+        /// </remarks>
+        public int MillisecondsTimeout { get; set; }
     }
 }

@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
 using Rest.Common;
 
@@ -131,7 +132,7 @@ namespace Rest.Server
                     // Not a REST method.
                     continue;
                 }
-                var methodName =(attr.Name == null ? method.Name.ToLower() : attr.Name);
+                var methodName = (attr.Name == null ? method.Name.ToLower() : attr.Name);
                 var parameters = method.GetParameters();
                 if (parameters.Length < 1 || parameters.Length > 2 || parameters[0].ParameterType != typeof(string[]))
                     throw new Exception(string.Format("Invalid signature for RestHandler method '{0}': invalid argments. Must have a single argument of String Array (String[]) type.", methodName));
@@ -143,7 +144,8 @@ namespace Rest.Server
                     Name = methodName,
                     ParamCount = attr.ParamCount,
                     ContentType = attr.ContentType,
-                    Verb = isPost ? "POST" : "GET"
+                    Verb = isPost ? "POST" : "GET",
+                    MillisecondsTimeout = attr.MillisecondsTimeout,
                 };
                 if (method.ReturnType == typeof(byte[]))
                 {
@@ -221,7 +223,7 @@ namespace Rest.Server
             OnStopped();
         }
 
-        private void ProcessRequest(HttpListenerContext context)
+        private async void ProcessRequest(HttpListenerContext context)
         {
             Uri uri = null;
             try
@@ -232,17 +234,11 @@ namespace Rest.Server
                 if (verb == "POST")
                     using (var reader = new StreamReader(context.Request.InputStream))
                         body = reader.ReadToEnd();
-                byte[] response;
                 foreach (var method in Methods.Where(m => m.Verb == verb))
                 {
-                    RestMethodMatch match = method.TryProcess(uri, body, out response);
-                    if (match != RestMethodMatch.Success)
-                        continue;
-                    context.Response.ContentType = method.ContentType;
-                    context.Response.ContentLength64 = response.Length;
-                    context.Response.OutputStream.Write(response, 0, response.Length);
-                    SendResponse(context.Response, 200);
-                    return;
+                    RestMethodMatch match = await TryProcessMethod(method, context, uri, body).ConfigureAwait(false);
+                    if (match == RestMethodMatch.Success)
+                        return;
                 }
                 // No matching method found
                 SendResponse(context.Response, 404);
@@ -262,11 +258,65 @@ namespace Rest.Server
             }
         }
 
+        private async Task<RestMethodMatch> TryProcessMethod(RestMethod method, HttpListenerContext context, Uri uri, string body)
+        {
+            var path = uri.PathAndQuery;
+            if (!path.Equals(method.BaseUri) && !path.StartsWith(method.BaseUri + "/"))
+            {
+                return RestMethodMatch.NameMismatch;
+            }
+            var paramString = path.Substring(method.BaseUri.Length);
+            var paramValues = paramString.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries).Select(p => Uri.UnescapeDataString(p)).ToArray();
+            if (paramValues.Length != method.ParamCount)
+            {
+                return RestMethodMatch.ParamMismatch;
+            }
+            byte[] response;
+            var handlerTask = Task.Run(() => method.Handler(paramValues, body));
+            if (method.MillisecondsTimeout == -1)
+            {
+                response = await handlerTask;
+            }
+            else
+            {
+                var completedTask = await Task.WhenAny(handlerTask, Task.Delay(method.MillisecondsTimeout));
+                if (completedTask == handlerTask)
+                    response = await handlerTask;
+                else
+                    throw new OperationCanceledException();
+            }
+            context.Response.ContentType = method.ContentType;
+            context.Response.ContentLength64 = response.Length;
+            context.Response.OutputStream.Write(response, 0, response.Length);
+            SendResponse(context.Response, 200);
+            return RestMethodMatch.Success;
+        }
+
         protected virtual void SendResponse(HttpListenerResponse response, int status)
         {
             response.StatusCode = status;
             response.StatusDescription = HttpWorkerRequest.GetStatusDescription(response.StatusCode);
             response.OutputStream.Close();
         }
+
+        /// <summary>
+        /// Indicates how a uri matches or does not match the method signature.
+        /// </summary>
+        private enum RestMethodMatch
+        {
+            /// <summary>
+            /// The uri matches the method signature.
+            /// </summary>
+            Success,
+            /// <summary>
+            /// The uri does not the method signature because the name is incorrect.
+            /// </summary>
+            NameMismatch,
+            /// <summary>
+            /// The uri does not the method signature because the wrong number of parameters are present.
+            /// </summary>
+            ParamMismatch
+        }
+
     }
 }

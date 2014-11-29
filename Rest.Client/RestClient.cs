@@ -108,7 +108,7 @@ namespace Rest.Client
         /// </summary>
         /// <typeparam name="T">The type of object expected to be returned</typeparam>
         /// <param name="uri">The full URI of the REST request</param>
-        /// <returns>The deserialized JSON object</returns>
+        /// <returns>The deserialized object</returns>
         public async Task<WebResult<T>> ExecuteJson<T>(string uri, WebHeaderCollection customHeaders = null)
         {
             var result = await ExecuteString(uri, customHeaders);
@@ -136,7 +136,7 @@ namespace Rest.Client
         /// </summary>
         /// <typeparam name="T">The type of object expected to be returned</typeparam>
         /// <param name="uri">The full URI of the REST request</param>
-        /// <returns>The deserialized JSON object</returns>
+        /// <returns>The deserialized object</returns>
         public async Task<WebResult<T>> ExecuteXml<T>(string uri, WebHeaderCollection customHeaders = null)
         {
             var result = await ExecuteString(uri, customHeaders);
