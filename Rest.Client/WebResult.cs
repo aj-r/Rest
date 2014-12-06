@@ -5,6 +5,11 @@ namespace Rest.Client
 {
     public struct WebResult<T>
     {
+        public static WebResult<T> Empty
+        {
+            get { return new WebResult<T>(-1, null, default(T)); }
+        }
+
         private readonly int statusCode;
         private readonly string contentType;
         private readonly T value;
