@@ -285,10 +285,17 @@ namespace Rest.Server
                 else
                     throw new OperationCanceledException();
             }
-            context.Response.ContentType = method.ContentType;
-            context.Response.ContentLength64 = response.Length;
-            context.Response.OutputStream.Write(response, 0, response.Length);
-            SendResponse(context.Response, 200);
+            if (response != null)
+            {
+                context.Response.ContentType = method.ContentType;
+                context.Response.ContentLength64 = response.Length;
+                context.Response.OutputStream.Write(response, 0, response.Length);
+                SendResponse(context.Response, 200);
+            }
+            else
+            {
+                SendResponse(context.Response, 404);
+            }
             return RestMethodMatch.Success;
         }
 
