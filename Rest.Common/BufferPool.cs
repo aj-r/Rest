@@ -23,6 +23,8 @@ namespace Rest.Common
         public byte[] GetBuffer(int size)
         {
             // TODO: maybe use Monitor.TryEnter() and just create a new buffer if failing to acquire lock.
+            if (size <= 0)
+                return new byte[0];
             lock (pool)
             {
                 int i = GetListIndex(size);
@@ -58,7 +60,7 @@ namespace Rest.Common
                 return 0;
             int i = (pool.Count - 1) / 2;
             int dist = pool.Count / 4;
-            while (i > 0 && i < pool.Count)
+            while (i > 0 && i < pool.Count && dist > 1)
             {
                 var currentSize = pool[i].Length;
                 if (currentSize == size)
