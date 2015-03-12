@@ -18,12 +18,25 @@ namespace Rest.Server
     /// </summary>
     public class RestServer
     {
+        public RestServer()
+            : this(false)
+        { }
+
+        public RestServer(bool useSsl)
+            : this(useSsl ? 443 : 80, false)
+        { }
+
         public RestServer(int port)
+            : this(port, false)
+        { }
+
+        public RestServer(int port, bool useSsl)
         {
             if (port <= 0 || port > 65535)
                 throw new ArgumentException("Port must be between 1 and 65535.", "port");
             Methods = new List<RestMethod>();
             Port = port;
+            UseSsl = useSsl;
             RegisterMethods(this);
         }
 
@@ -50,18 +63,10 @@ namespace Rest.Server
         private Thread listenThread;
         private ManualResetEvent stopEvent = new ManualResetEvent(false);
 
-        private int port;
+        public int Port { get; private set; }
 
-        public int Port
-        {
-            get { return port; }
-            protected set
-            {
-                if (IsRunning)
-                    throw new InvalidOperationException("Cannot change port while server is running.");
-                port = value;
-            }
-        }
+        public bool UseSsl { get; private set; }
+
         public bool IsRunning { get; private set; }
 
         /// <summary>
@@ -185,7 +190,8 @@ namespace Rest.Server
             stopEvent.Reset();
             IsRunning = true;
             listener = new HttpListener();
-            listener.Prefixes.Add(string.Format("http://*:{0}/", port));
+            // e.g. http://*:80/
+            listener.Prefixes.Add(string.Format("{0}://*:{1}/", UseSsl ? "https" : "http", Port));
             try
             {
                 listener.Start();
