@@ -241,7 +241,8 @@ namespace Rest.Server
                         return;
                 }
                 // No matching method found
-                SendResponse(context.Response, 404);
+                SetResponseCode(context.Response, 404);
+                SendResponse(context.Response);
             }
             catch (Exception ex)
             {
@@ -252,7 +253,8 @@ namespace Rest.Server
                 catch { }
                 try
                 {
-                    SendResponse(context.Response, 500);
+                    SetResponseCode(context.Response, 500);
+                    SendResponse(context.Response);
                 }
                 catch { }
             }
@@ -287,22 +289,28 @@ namespace Rest.Server
             }
             if (response != null)
             {
+                SetResponseCode(context.Response, 200);
                 context.Response.ContentType = method.ContentType;
                 context.Response.ContentLength64 = response.Length;
                 context.Response.OutputStream.Write(response, 0, response.Length);
-                SendResponse(context.Response, 200);
+                SendResponse(context.Response);
             }
             else
             {
-                SendResponse(context.Response, 404);
+                SetResponseCode(context.Response, 404);
+                SendResponse(context.Response);
             }
             return RestMethodMatch.Success;
         }
 
-        protected virtual void SendResponse(HttpListenerResponse response, int status)
+        protected void SetResponseCode(HttpListenerResponse response, int status)
         {
             response.StatusCode = status;
             response.StatusDescription = HttpWorkerRequest.GetStatusDescription(response.StatusCode);
+        }
+
+        protected virtual void SendResponse(HttpListenerResponse response)
+        {
             response.OutputStream.Close();
         }
 
