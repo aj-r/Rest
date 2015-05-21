@@ -8,25 +8,25 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Xml.Serialization;
-using JsonSerialization;
+using Newtonsoft.Json;
 using Rest.Common;
 
 namespace Rest.Client
 {
     public class RestClient
     {
-        private static JavaScriptSerializer jsonSerializer;
-        private static NameJavaScriptConverter jsonConverter;
+        //private static JavaScriptSerializer jsonSerializer;
+        //private static NameJavaScriptConverter jsonConverter;
 
         public event RequestErrorEventHandler RequestError;
-
+/*
         static RestClient()
         {
             jsonSerializer = new JavaScriptSerializer();
             jsonConverter = new NameJavaScriptConverter();
             jsonSerializer.RegisterConverters(new JavaScriptConverter[] { jsonConverter });
         }
-
+*/
         /// <summary>
         /// Executes a REST request and returns the body in byte array format.
         /// </summary>
@@ -118,7 +118,7 @@ namespace Rest.Client
             try
             {
                 var json = result.Value;
-                var value = DeserializeJson<T>(json);
+                var value = JsonConvert.DeserializeObject<T>(json);
                 return new WebResult<T>(result.StatusCode, result.ContentType, value);
             }
             catch (Exception ex)
@@ -185,7 +185,7 @@ namespace Rest.Client
                 return new WebResult<byte[]>(0, null, new byte[0]);
             }
         }
-        
+        /*
         /// <summary>
         /// Converts a JSON string to a CLR object
         /// </summary>
@@ -195,7 +195,7 @@ namespace Rest.Client
             var obj = jsonSerializer.Deserialize<T>(json);
             return obj;
         }
-
+        */
         /// <summary>
         /// Converts an XML string to a CLR object
         /// </summary>

@@ -30,6 +30,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\LolSpectator\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Web.Extensions" />
@@ -45,14 +49,13 @@
     <Compile Include="WebResult.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\JsonSerialization\JsonSerialization.csproj">
-      <Project>{2a27274d-6eb8-48b1-b524-b8f65f9e16cf}</Project>
-      <Name>JsonSerialization</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Rest.Common\Rest.Common.csproj">
       <Project>{2874d6f8-b93e-4a7b-aecc-21786a0205a7}</Project>
       <Name>Rest.Common</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
